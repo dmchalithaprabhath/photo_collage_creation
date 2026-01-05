@@ -137,37 +137,47 @@ function canPlace(placedImages, x, y, width, height, spacing, frameWidth, frameH
 }
 
 // Find best position for an image using bottom-left fill algorithm
+// Tries both original and rotated (90°) orientations
 function findBestPosition(placedImages, imgWidth, imgHeight, spacing, frameWidth, frameHeight) {
     const positions = [];
     
-    // Try placing at origin
-    if (canPlace(placedImages, spacing, spacing, imgWidth, imgHeight, spacing, frameWidth, frameHeight)) {
-        positions.push({ x: spacing, y: spacing });
-    }
+    // Helper function to try placing at various positions
+    const tryPlace = (width, height, rotated = false) => {
+        // Try placing at origin
+        if (canPlace(placedImages, spacing, spacing, width, height, spacing, frameWidth, frameHeight)) {
+            positions.push({ x: spacing, y: spacing, width, height, rotated });
+        }
+        
+        // Try placing next to existing images (bottom-left fill strategy)
+        for (const img of placedImages) {
+            // Try to the right of this image (same y level)
+            const x = img.x + img.width + spacing;
+            const y = img.y;
+            if (canPlace(placedImages, x, y, width, height, spacing, frameWidth, frameHeight)) {
+                positions.push({ x, y, width, height, rotated });
+            }
+            
+            // Try below this image (same x level)
+            const x2 = img.x;
+            const y2 = img.y + img.height + spacing;
+            if (canPlace(placedImages, x2, y2, width, height, spacing, frameWidth, frameHeight)) {
+                positions.push({ x: x2, y: y2, width, height, rotated });
+            }
+            
+            // Try at top-right corner of this image
+            const x3 = img.x + img.width + spacing;
+            const y3 = spacing;
+            if (canPlace(placedImages, x3, y3, width, height, spacing, frameWidth, frameHeight)) {
+                positions.push({ x: x3, y: y3, width, height, rotated });
+            }
+        }
+    };
     
-    // Try placing next to existing images (bottom-left fill strategy)
-    for (const img of placedImages) {
-        // Try to the right of this image (same y level)
-        const x = img.x + img.width + spacing;
-        const y = img.y;
-        if (canPlace(placedImages, x, y, imgWidth, imgHeight, spacing, frameWidth, frameHeight)) {
-            positions.push({ x, y });
-        }
-        
-        // Try below this image (same x level)
-        const x2 = img.x;
-        const y2 = img.y + img.height + spacing;
-        if (canPlace(placedImages, x2, y2, imgWidth, imgHeight, spacing, frameWidth, frameHeight)) {
-            positions.push({ x: x2, y: y2 });
-        }
-        
-        // Try at top-right corner of this image
-        const x3 = img.x + img.width + spacing;
-        const y3 = spacing;
-        if (canPlace(placedImages, x3, y3, imgWidth, imgHeight, spacing, frameWidth, frameHeight)) {
-            positions.push({ x: x3, y: y3 });
-        }
-    }
+    // Try original orientation
+    tryPlace(imgWidth, imgHeight, false);
+    
+    // Try rotated orientation (90 degrees - swap width and height)
+    tryPlace(imgHeight, imgWidth, true);
     
     if (positions.length === 0) return null;
     
@@ -208,7 +218,10 @@ function calculateFrameLayout(frameWidth, frameHeight, spacing, images) {
             placedImages.push({
                 ...imgData,
                 x: position.x,
-                y: position.y
+                y: position.y,
+                displayWidth: position.width,
+                displayHeight: position.height,
+                rotated: position.rotated
             });
         }
     }
@@ -217,8 +230,8 @@ function calculateFrameLayout(frameWidth, frameHeight, spacing, images) {
     let maxY = 0;
     let maxX = 0;
     for (const img of placedImages) {
-        maxY = Math.max(maxY, img.y + img.height + spacing);
-        maxX = Math.max(maxX, img.x + img.width + spacing);
+        maxY = Math.max(maxY, img.y + img.displayHeight + spacing);
+        maxX = Math.max(maxX, img.x + img.displayWidth + spacing);
     }
     
     // Validate final layout
@@ -236,17 +249,40 @@ function calculateFrameLayout(frameWidth, frameHeight, spacing, images) {
 }
 
 // Create multiple frames
-function createMultipleFrames(frameWidth, frameHeight, spacing, bgColor, images) {
+function createMultipleFrames(frameWidth, frameHeight, spacing, bgColor, images, dpi) {
     frames = [];
     let remainingImages = [...images];
     let frameIndex = 0;
     
-    // Check if any image is too large for a single frame
-    const maxImageWidth = Math.max(...images.map(img => img.width));
-    const maxImageHeight = Math.max(...images.map(img => img.height));
+    // Check if any image is too large for a single frame (try both orientations)
+    let maxRequiredWidth = 0;
+    let maxRequiredHeight = 0;
+    let imageTooLarge = false;
     
-    if (maxImageWidth + 2 * spacing > frameWidth || maxImageHeight + 2 * spacing > frameHeight) {
-        showError(`Some images are too large for the frame size. Largest image requires ${Math.round((maxImageWidth + 2 * spacing)/300*100)/100}" × ${Math.round((maxImageHeight + 2 * spacing)/300*100)/100}" but frame is ${frameWidthInput.value}" × ${frameHeightInput.value}".`);
+    for (const img of images) {
+        // Try original orientation
+        const width1 = img.width + 2 * spacing;
+        const height1 = img.height + 2 * spacing;
+        // Try rotated orientation
+        const width2 = img.height + 2 * spacing;
+        const height2 = img.width + 2 * spacing;
+        
+        // Check if image fits in at least one orientation
+        const fitsOriginal = width1 <= frameWidth && height1 <= frameHeight;
+        const fitsRotated = width2 <= frameWidth && height2 <= frameHeight;
+        
+        if (!fitsOriginal && !fitsRotated) {
+            // Image doesn't fit in either orientation
+            imageTooLarge = true;
+            maxRequiredWidth = Math.max(maxRequiredWidth, width1, width2);
+            maxRequiredHeight = Math.max(maxRequiredHeight, height1, height2);
+        }
+    }
+    
+    if (imageTooLarge) {
+        const requiredWidthInches = Math.round(maxRequiredWidth / dpi * 100) / 100;
+        const requiredHeightInches = Math.round(maxRequiredHeight / dpi * 100) / 100;
+        showError(`Some images are too large for the frame size. Largest image requires ${requiredWidthInches}" × ${requiredHeightInches}" but frame is ${frameWidthInput.value}" × ${frameHeightInput.value}".`);
         return;
     }
     
@@ -299,8 +335,30 @@ function drawFrame(frame, frameIndex) {
         img.src = imgData.dataUrl;
         
         img.onload = () => {
-            // Draw image at full size at calculated position
-            frame.ctx.drawImage(img, imgData.x, imgData.y, img.width, img.height);
+            const ctx = frame.ctx;
+            
+            if (imgData.rotated) {
+                // Save context state
+                ctx.save();
+                
+                // Calculate center point of where image will be drawn
+                const centerX = imgData.x + imgData.displayWidth / 2;
+                const centerY = imgData.y + imgData.displayHeight / 2;
+                
+                // Translate to center, rotate 90 degrees clockwise
+                ctx.translate(centerX, centerY);
+                ctx.rotate(Math.PI / 2); // 90 degrees clockwise
+                
+                // Draw image centered at origin (after rotation)
+                // Since we rotated, we draw with swapped dimensions
+                ctx.drawImage(img, -imgData.displayHeight / 2, -imgData.displayWidth / 2, imgData.displayHeight, imgData.displayWidth);
+                
+                // Restore context state
+                ctx.restore();
+            } else {
+                // Draw image normally at full size
+                ctx.drawImage(img, imgData.x, imgData.y, imgData.displayWidth, imgData.displayHeight);
+            }
             
             frame.imagesLoaded++;
             // Show result when all images in this frame are loaded
@@ -390,7 +448,7 @@ generateBtn.addEventListener('click', () => {
     const spacing = inchesToPixels(spacingInches, dpi);
     
     hideError();
-    createMultipleFrames(frameWidth, frameHeight, spacing, bgColor, selectedImages);
+    createMultipleFrames(frameWidth, frameHeight, spacing, bgColor, selectedImages, dpi);
 });
 
 // Download all frames
