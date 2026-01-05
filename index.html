@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Collage Maker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📸 Photo Collage Maker</h1>
+            <p>Upload multiple images to create a beautiful collage</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <label for="imageInput" class="upload-btn">
+                    <span>📁 Select Images</span>
+                    <input type="file" id="imageInput" multiple accept="image/*" hidden>
+                </label>
+                <div id="imageCount" class="image-count"></div>
+            </div>
+
+            <div id="previewSection" class="preview-section hidden">
+                <h2>Selected Images</h2>
+                <div id="imagePreview" class="image-preview"></div>
+                <div class="controls">
+                    <div class="frame-size-group">
+                        <h3>Frame Size</h3>
+                        <div class="frame-inputs">
+                            <label for="frameWidthInput">Width (inches):</label>
+                            <input type="number" id="frameWidthInput" min="1" max="100" step="0.1" value="10">
+                            <label for="frameHeightInput">Height (inches):</label>
+                            <input type="number" id="frameHeightInput" min="1" max="100" step="0.1" value="8">
+                            <label for="dpiInput">DPI:</label>
+                            <select id="dpiInput">
+                                <option value="96">96 (Screen)</option>
+                                <option value="300" selected>300 (Print)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="spacing-group">
+                        <label for="spacingInput">Spacing (inches):</label>
+                        <input type="number" id="spacingInput" min="0" max="2" step="0.1" value="0.1">
+                    </div>
+                    <label for="bgColorInput">Background:</label>
+                    <input type="color" id="bgColorInput" value="#ffffff">
+                    <button id="generateBtn" class="generate-btn">Generate Collage</button>
+                    <button id="clearBtn" class="clear-btn">Clear All</button>
+                </div>
+                <div id="errorMessage" class="error-message hidden"></div>
+            </div>
+
+            <div id="resultSection" class="result-section hidden">
+                <h2>Your Collage</h2>
+                <div id="canvasContainer" class="canvas-container"></div>
+                <button id="downloadBtn" class="download-btn">Download Collage</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
